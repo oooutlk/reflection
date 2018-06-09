@@ -17,4 +17,4 @@ proc-macro = true
 syn = "0.12"
 quote = "0.4"
 serde_derive_internals = "0.21"
-trees = "*"
+trees = "0.1"

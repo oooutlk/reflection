@@ -10,4 +10,4 @@ documentation = "https://docs.rs/reflection"
 description = "reflection of field names of user defined types"
 
 [dependencies]
-trees = "*"
+trees = "0.1"
