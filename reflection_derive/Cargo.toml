@@ -1,0 +1,20 @@
+[package]
+name = "reflection_derive"
+version = "0.1.0"
+authors = ["oooutlk <oooutlk@outlook.com>"]
+license = "MIT"
+keywords = [ "reflect", "reflection" ]
+readme = "README.md"
+repository = "https://github.com/oooutlk/reflection"
+documentation = "https://docs.rs/reflection_derive"
+description = "reflection of field names of user defined types"
+
+
+[lib]
+proc-macro = true
+
+[dependencies]
+syn = "0.12"
+quote = "0.4"
+serde_derive_internals = "0.21"
+trees = "*"

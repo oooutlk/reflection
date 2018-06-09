@@ -1,0 +1,13 @@
+[package]
+name = "reflection_test"
+version = "0.1.0"
+authors = ["oooutlk <oooutlk@outlook.com>"]
+publish = false
+
+[features]
+custom_attribute = []
+
+[dependencies]
+reflection = { path = "../reflection" }
+reflection_derive = { path = "../reflection_derive" }
+trees = "*"

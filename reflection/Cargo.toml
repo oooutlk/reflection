@@ -1,0 +1,13 @@
+[package]
+name = "reflection"
+version = "0.1.0"
+authors = ["oooutlk <oooutlk@outlook.com>"]
+license = "MIT"
+keywords = [ "reflect", "reflection" ]
+readme = "README.md"
+repository = "https://github.com/oooutlk/reflection"
+documentation = "https://docs.rs/reflection"
+description = "reflection of field names of user defined types"
+
+[dependencies]
+trees = "*"
