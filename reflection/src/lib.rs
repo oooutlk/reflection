@@ -6,7 +6,7 @@
 //!
 //! # Example
 //!
-//! See [`fn serde_issue_345()`](https://github.com/oooutlk/reflection/tree/master/reflection_test/src/lib.rs#L151) for generating pretty print format from `schemata()`.
+//! See [`fn serde_issue_345()`](https://github.com/oooutlk/reflection/blob/master/reflection_test/src/lib.rs#L151) for generating pretty print format from `schemata()`.
 
 extern crate trees;
 use trees::{tr,Tree,Forest,Node};
