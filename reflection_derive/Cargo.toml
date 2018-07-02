@@ -1,13 +1,13 @@
 [package]
 name = "reflection_derive"
-version = "0.1.0"
+version = "0.1.1"
 authors = ["oooutlk <oooutlk@outlook.com>"]
 license = "MIT"
-keywords = [ "reflect", "reflection" ]
+keywords = [ "reflect", "reflection", "type", "schema" ]
 readme = "README.md"
 repository = "https://github.com/oooutlk/reflection"
 documentation = "https://docs.rs/reflection_derive"
-description = "reflection of field names of user defined types"
+description = "reflects of type's fields' names and their type names in a hierarchical tree"
 
 
 [lib]
@@ -17,4 +17,3 @@ proc-macro = true
 syn = "0.12"
 quote = "0.4"
 serde_derive_internals = "0.21"
-trees = "0.1"

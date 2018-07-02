@@ -1,5 +1,5 @@
-The `reflection` crate currently provides reflection of field names of struct or variant names of enum.
+The `reflection` crate currently provides reflection of field names and tupe names.
 
-See `reflection_test` for quickstart.
+[Quickstart](https://github.com/oooutlk/reflection/reflection_test/src/lib.rs)
 
 Licensed under MIT.
