@@ -1,6 +1,6 @@
 [package]
 name = "reflection"
-version = "0.1.1"
+version = "0.1.2"
 authors = ["oooutlk <oooutlk@outlook.com>"]
 license = "MIT"
 keywords = [ "reflect", "reflection", "type", "schema" ]

@@ -17,20 +17,24 @@ use std::fmt::{Display,Formatter};
 pub type Id = &'static str;
 pub type Name = Option<String>;
 
-#[derive( Copy, Clone, PartialEq, Eq, Ord )]
+#[derive( Copy, Clone, Debug, PartialEq, Eq, Ord )]
 /// Type constructs.
 pub enum Type {
     Unknown,
     Struct, Enum,
     Bool, I8, U8, I16, U16, I32, U32, I64, U64, I128, U128, F32, F64,
+    Range,
     RefStr, String,
     Array, Tuple, Vec, 
     CPtr, Ptr, NonNull, Ref, RefMut, Box, Rc,
+    Option, Result,
+    BTreeSet, HashSet,
+    BTreeMap, HashMap,
 }
 
 impl Type {
     /// Returns `true` for the generalized pointer types such as raw/smart pointers and references, otherwise returns `false`.
-    pub fn is_pointer( &self ) -> bool { *self >= Type::CPtr }
+    pub fn is_pointer( &self ) -> bool { *self >= Type::CPtr && *self <= Type::Rc }
 }
 
 use std::cmp::Ordering;
@@ -51,20 +55,24 @@ impl PartialOrd for Type {
 
 impl Display for Type { fn fmt( &self, f: &mut Formatter ) -> fmt::Result { write!( f, "{}", TYPE_STR[ *self as usize ])}}
 
-const TYPE_STR: [Id;28] = [
+const TYPE_STR: [Id;35] = [
     "?",
     "struct", "enum",
     "bool", "i8", "u8", "i16", "u16", "i32", "u32", "i64", "u64", "i128", "u128", "f32", "f64",
+    "Range",
     "&str", "String",
     "[]", "()", "Vec", 
     "*const", "*mut", "NonNull", "&", "&mut", "Box", "Rc",
+    "Option", "Result",
+    "BTreeSet", "HashSet",
+    "BTreeMap", "HashMap",
 ];
 
 /// To get the members of some type.
 pub type Expander = Option<fn() -> Schemas>;
 
 /// A type definition, or a field definition of some struct.
-#[derive( Clone, PartialEq, Eq )]
+#[derive( Clone, Debug, PartialEq, Eq )]
 pub struct Field {
     pub id       : Id,
     pub ty       : Type,
@@ -79,17 +87,26 @@ impl Field {
 }
 
 /// A variant definition of some enum.
-#[derive( Clone, Eq, PartialEq )]
+#[derive( Clone, Debug, Eq, PartialEq )]
 pub struct Variant {
     pub id     : Id,
     pub tyname : Name,
 }
 
 /// The type of schema tree node.
-#[derive( Eq, PartialEq )]
+#[derive( Clone, Debug, PartialEq, Eq )]
 pub enum Member {
     Field( Field ),
     Variant( Variant ),
+}
+
+impl Member {
+    pub fn id( &self ) -> Id {
+        match *self {
+            Member::Field( ref field ) => field.id,
+            Member::Variant( ref variant ) => variant.id,
+        }
+    }
 }
 
 /// Defines a `Field` as a tree node.
@@ -141,12 +158,13 @@ pub trait Reflection {
 }
 
 /// Expands `schema()` recursively, stopping at fields of primitives or pointers.
+#[allow( unused_must_use )]
 pub fn expand( node: &mut Node<Member> ) {
     expand_field( node ) || expand_variant( node );
 }
 
 fn expand_field( node: &mut Node<Member> ) -> bool {
-    let mut expander : Expander = None;
+    let mut expander: Expander = None;
     if let Member::Field( ref field ) = node.data {
         if node.is_leaf() && !field.ty.is_pointer() {
             expander = field.expander;
@@ -202,71 +220,155 @@ impl Reflection for u128 { fn ty() -> Type { Type::U128 } fn schema( id: Id ) ->
 impl Reflection for f32  { fn ty() -> Type { Type::F32  } fn schema( id: Id ) -> Schema { terminal( id, Type::F32  )}}
 impl Reflection for f64  { fn ty() -> Type { Type::F64  } fn schema( id: Id ) -> Schema { terminal( id, Type::F64  )}}
 
+impl<T:Reflection> Reflection for std::ops::Range<T> {
+    fn ty() -> Type { Type::Range }
+    fn name() -> Name { Some( format!( "Range<{}>", name_!(T) ))}
+    fn schema( id: Id ) -> Schema { field( id, Type::Range, name!(Self), expander!(Self) )}
+    fn members() -> Schemas {
+        - field( "start", ty!(T), name!(T), expander!(T) )
+        - field( "end",   ty!(T), name!(T), expander!(T) )
+    }
+}
+
 impl<'a> Reflection for &'a str { fn ty() -> Type { Type::RefStr } fn schema( id: Id ) -> Schema { terminal( id, Type::String )}}
 impl     Reflection for String  { fn ty() -> Type { Type::String } fn schema( id: Id ) -> Schema { terminal( id, Type::String )}}
 
 impl<T> Reflection for *const T where T: ?Sized + Reflection {
     fn ty() -> Type { Type::CPtr }
     fn name() -> Name { Some( format!( "*const {}", name_!(T) ))}
-    fn schema( id: Id ) -> Schema { field( id, Type::CPtr, name!(Self), expander!( Self ))}
+    fn schema( id: Id ) -> Schema { field( id, Type::CPtr, name!(Self), expander!(Self) )}
     fn members() -> Schemas { - field( "_", ty!(T), name!(T), expander!(T) )}
 }
 
 impl<T> Reflection for *mut T where T: ?Sized + Reflection {
     fn ty() -> Type { Type::Ptr }
     fn name() -> Name { Some( format!( "*mut {}", name_!(T) ))}
-    fn schema( id: Id ) -> Schema { field( id, Type::Ptr, name!(Self), expander!( Self ))}
+    fn schema( id: Id ) -> Schema { field( id, Type::Ptr, name!(Self), expander!(Self) )}
     fn members() -> Schemas { - field( "_", ty!(T), name!(T), expander!(T) )}
 }
 
 impl<T> Reflection for std::ptr::NonNull<T> where T: ?Sized + Reflection {
     fn ty() -> Type { Type::NonNull }
     fn name() -> Name { Some( format!( "NonNull<{}>", name_!(T) ))}
-    fn schema( id: Id ) -> Schema { field( id, Type::NonNull, name!(Self), expander!( Self ))}
+    fn schema( id: Id ) -> Schema { field( id, Type::NonNull, name!(Self), expander!(Self) )}
     fn members() -> Schemas { - field( "_", ty!(T), name!(T), expander!(T) )}
 }
 
 impl<'a,T> Reflection for &'a T where T: 'a + ?Sized + Reflection {
     fn ty() -> Type { Type::Ref }
     fn name() -> Name { Some( format!( "&{}", name_!(T) ))}
-    fn schema( id: Id ) -> Schema { field( id, Type::Ref, name!(Self), expander!( Self ))}
+    fn schema( id: Id ) -> Schema { field( id, Type::Ref, name!(Self), expander!(Self) )}
     fn members() -> Schemas { - field( "_", ty!(T), name!(T), expander!(T) )}
 }
 
 impl<'a,T> Reflection for &'a mut T where T: 'a + ?Sized + Reflection {
     fn ty() -> Type { Type::RefMut }
     fn name() -> Name { Some( format!( "&mut {}", name_!(T) ))}
-    fn schema( id: Id ) -> Schema { field( id, Type::RefMut, name!(Self), expander!( Self ))}
-    fn members() -> Schemas { - field( "_", ty!(T), name!(T), expander!(T) )}
-}
-
-impl<T> Reflection for [T] where T: Reflection {
-    fn ty() -> Type { Type::Array }
-    fn name() -> Name { Some( format!( "[{}]", name_!(T) ))}
-    fn schema( id: Id ) -> Schema { field( id, Type::Array, name!(Self), expander!( Self ))}
+    fn schema( id: Id ) -> Schema { field( id, Type::RefMut, name!(Self), expander!(Self) )}
     fn members() -> Schemas { - field( "_", ty!(T), name!(T), expander!(T) )}
 }
 
 impl<T> Reflection for Box<T> where T: ?Sized + Reflection {
     fn ty() -> Type { Type::Box }
     fn name() -> Name { Some( format!( "Box<{}>", name_!(T) ))}
-    fn schema( id: Id ) -> Schema { field( id, Type::Box, name!(Self), expander!( Self ))}
+    fn schema( id: Id ) -> Schema { field( id, Type::Box, name!(Self), expander!(Self) )}
     fn members() -> Schemas { - field( "_", ty!(T), name!(T), expander!(T) )}
 }
 
 impl<T> Reflection for std::rc::Rc<T> where T: ?Sized + Reflection {
     fn ty() -> Type { Type::Rc }
     fn name() -> Name { Some( format!( "Rc<{}>", name_!(T) ))}
-    fn schema( id: Id ) -> Schema { field( id, Type::Rc, name!(Self), expander!( Self ))}
+    fn schema( id: Id ) -> Schema { field( id, Type::Rc, name!(Self), expander!(Self) )}
     fn members() -> Schemas { - field( "_", ty!(T), name!(T), expander!(T) )}
 }
 
 impl<T> Reflection for Vec<T> where T: Reflection {
     fn ty() -> Type { Type::Vec }
     fn name() -> Name { Some( format!( "Vec<{}>", name_!(T) ))}
-    fn schema( id: Id ) -> Schema { field( id, Type::Vec, name!(Self), expander!( Self ))}
+    fn schema( id: Id ) -> Schema { field( id, Type::Vec, name!(Self), expander!(Self) )}
     fn members() -> Schemas { - field( "_", ty!(T), name!(T), expander!(T) )}
 }
+
+impl<T> Reflection for Option<T> where T: Reflection {
+    fn ty() -> Type { Type::Enum }
+    fn name() -> Name { Some( format!( "Option<{}>", name_!(T) ))}
+    fn schema( id: Id ) -> Schema { field( id, Type::Option, name!(Self), expander!(Self) )}
+    fn members() -> Schemas {
+        -( variant( "None" ))
+        -( variant( "Some" ) / field( "0", ty!(T), name!(T), expander!(T) ))
+    }
+}
+
+impl<T,E> Reflection for Result<T,E> where T: Reflection, E: Reflection {
+    fn ty() -> Type { Type::Result }
+    fn name() -> Name { Some( format!( "Result<{},{}>", name_!(T), name_!(E) ))}
+    fn schema( id: Id ) -> Schema { field( id, Type::Result, name!(Self), expander!(Self) )}
+    fn members() -> Schemas {
+        -( variant( "Ok"  ) / field( "_", ty!(T), name!(T), expander!(T) ))
+        -( variant( "Err" ) / field( "_", ty!(E), name!(E), expander!(E) ))
+    }
+}
+
+impl<T:Reflection> Reflection for std::collections::BTreeSet<T> {
+    fn ty() -> Type { Type::BTreeSet }
+    fn name() -> Name { Some( format!( "BTreeSet<{}>", name_!(T) ))}
+    fn schema( id: Id ) -> Schema { field( id, Type::BTreeSet, name!(Self), expander!(Self) )}
+    fn members() -> Schemas { - field( "_", ty!(T), name!(T), expander!(T) )}
+}
+
+impl<T:Reflection> Reflection for std::collections::HashSet<T> {
+    fn ty() -> Type { Type::HashSet }
+    fn name() -> Name { Some( format!( "HashSet<{}>", name_!(T) ))}
+    fn schema( id: Id ) -> Schema { field( id, Type::HashSet, name!(Self), expander!(Self) )}
+    fn members() -> Schemas { - field( "_", ty!(T), name!(T), expander!(T) )}
+}
+
+impl<K,V> Reflection for std::collections::BTreeMap<K,V> where K: Reflection, V: Reflection {
+    fn ty() -> Type { Type::BTreeMap }
+    fn name() -> Name { Some( format!( "BTreeMap<{},{}>", name_!(K), name_!(V) ))}
+    fn schema( id: Id ) -> Schema { field( id, Type::BTreeMap, name!(Self), expander!(Self) )}
+    fn members() -> Schemas {
+        - field( "name", ty!(K), name!(K), expander!(K) )
+        - field( "value", ty!(V), name!(V), expander!(V) )
+    }
+}
+
+impl<K,V> Reflection for std::collections::HashMap<K,V> where K: Reflection, V: Reflection {
+    fn ty() -> Type { Type::HashMap }
+    fn name() -> Name { Some( format!( "HashMap<{},{}>", name_!(K), name_!(V) ))}
+    fn schema( id: Id ) -> Schema { field( id, Type::HashMap, name!(Self), expander!(Self) )}
+    fn members() -> Schemas {
+        - field( "name", ty!(K), name!(K), expander!(K) )
+        - field( "value", ty!(V), name!(V), expander!(V) )
+    }
+}
+
+impl<T> Reflection for [T] where T: Reflection {
+    fn ty() -> Type { Type::Array }
+    fn name() -> Name { Some( format!( "[{}]", name_!(T) ))}
+    fn schema( id: Id ) -> Schema { field( id, Type::Array, name!(Self), expander!(Self) )}
+    fn members() -> Schemas { - field( "_", ty!(T), name!(T), expander!(T) )}
+}
+
+macro_rules! array_impls {
+    ($($len:tt)+) => {
+        $(
+            impl<T> Reflection for [T;$len] where T: Reflection {
+                fn ty() -> Type { Type::Array }
+                fn name() -> Name { Some( format!( "[{}]", name_!(T) ))}
+                fn schema( id: Id ) -> Schema { field( id, Type::Array, name!(Self), expander!(Self) )}
+                fn members() -> Schemas { - field( "_", ty!(T), name!(T), expander!(T) )}
+            }
+        )+
+    }
+}
+
+array_impls!(
+    01 02 03 04 05 06 07 08
+    09 10 11 12 13 14 15 16
+    17 18 19 20 21 22 23 24
+    25 26 27 28 29 30 31 32
+);
 
 impl Reflection for () {
     fn ty() -> Type { Type::Tuple }
@@ -279,7 +381,7 @@ impl<T0> Reflection for (T0,)
 {
     fn ty() -> Type { Type::Tuple }
     fn name() -> Name { Some( format!( "({},)", name_!(T0) ))}
-    fn schema( id: Id ) -> Schema { field( id, Type::Tuple, name!(Self), expander!( Self ))}
+    fn schema( id: Id ) -> Schema { field( id, Type::Tuple, name!(Self), expander!(Self) )}
     fn members() -> Schemas { - field( "0", ty!(T0), name!(T0), expander!(T0) )}
 }
 
@@ -288,7 +390,7 @@ impl<T0,T1> Reflection for (T0,T1)
 {
     fn ty() -> Type { Type::Tuple }
     fn name() -> Name { Some( format!( "({},{})", name_!(T0), name_!(T1) ))}
-    fn schema( id: Id ) -> Schema { field( id, Type::Tuple, name!(Self), expander!( Self ))}
+    fn schema( id: Id ) -> Schema { field( id, Type::Tuple, name!(Self), expander!(Self) )}
     fn members() -> Schemas {
         - field( "0", ty!(T0), name!(T0), expander!(T0) )
         - field( "1", ty!(T1), name!(T1), expander!(T1) )
@@ -300,7 +402,7 @@ impl<T0,T1,T2> Reflection for (T0,T1,T2)
 {
     fn ty() -> Type { Type::Tuple }
     fn name() -> Name { Some( format!( "({},{},{})", name_!(T0), name_!(T1), name_!(T2) ))}
-    fn schema( id: Id ) -> Schema { field( id, Type::Tuple, name!(Self), expander!( Self ))}
+    fn schema( id: Id ) -> Schema { field( id, Type::Tuple, name!(Self), expander!(Self) )}
     fn members() -> Schemas {
         - field( "0", ty!(T0), name!(T0), expander!(T0) )
         - field( "1", ty!(T1), name!(T1), expander!(T1) )
@@ -313,7 +415,7 @@ impl<T0,T1,T2,T3> Reflection for (T0,T1,T2,T3)
 {
     fn ty() -> Type { Type::Tuple }
     fn name() -> Name { Some( format!( "({},{},{},{})", name_!(T0), name_!(T1), name_!(T2), name_!(T3) ))}
-    fn schema( id: Id ) -> Schema { field( id, Type::Tuple, name!(Self), expander!( Self ))}
+    fn schema( id: Id ) -> Schema { field( id, Type::Tuple, name!(Self), expander!(Self) )}
     fn members() -> Schemas {
         - field( "0", ty!(T0), name!(T0), expander!(T0) )
         - field( "1", ty!(T1), name!(T1), expander!(T1) )
@@ -327,7 +429,7 @@ impl<T0,T1,T2,T3,T4> Reflection for (T0,T1,T2,T3,T4)
 {
     fn ty() -> Type { Type::Tuple }
     fn name() -> Name { Some( format!( "({},{},{},{},{})", name_!(T0), name_!(T1), name_!(T2), name_!(T3), name_!(T4) ))}
-    fn schema( id: Id ) -> Schema { field( id, Type::Tuple, name!(Self), expander!( Self ))}
+    fn schema( id: Id ) -> Schema { field( id, Type::Tuple, name!(Self), expander!(Self) )}
     fn members() -> Schemas {
         - field( "0", ty!(T0), name!(T0), expander!(T0) )
         - field( "1", ty!(T1), name!(T1), expander!(T1) )
@@ -342,7 +444,7 @@ impl<T0,T1,T2,T3,T4,T5> Reflection for (T0,T1,T2,T3,T4,T5)
 {
     fn ty() -> Type { Type::Tuple }
     fn name() -> Name { Some( format!( "({},{},{},{},{},{})", name_!(T0), name_!(T1), name_!(T2), name_!(T3), name_!(T4), name_!(T5) ))}
-    fn schema( id: Id ) -> Schema { field( id, Type::Tuple, name!(Self), expander!( Self ))}
+    fn schema( id: Id ) -> Schema { field( id, Type::Tuple, name!(Self), expander!(Self) )}
     fn members() -> Schemas {
         - field( "0", ty!(T0), name!(T0), expander!(T0) )
         - field( "1", ty!(T1), name!(T1), expander!(T1) )

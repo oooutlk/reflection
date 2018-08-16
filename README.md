@@ -1,5 +1,5 @@
-This project currently provides reflection of field names of struct or variant names of enum.
+The `reflection` crate currently provides reflection of field names and type names.
 
-See `reflection_test` for quickstart.
+See the sub directory `reflection_test` for quickstart.
 
 Licensed under MIT.
