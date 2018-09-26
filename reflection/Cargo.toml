@@ -1,13 +1,13 @@
 [package]
 name = "reflection"
-version = "0.1.2"
+version = "0.1.3"
 authors = ["oooutlk <oooutlk@outlook.com>"]
 license = "MIT"
-keywords = [ "reflect", "reflection", "type", "schema" ]
+keywords = [ "reflect", "reflection", "type", "schema", "tree" ]
 readme = "README.md"
 repository = "https://github.com/oooutlk/reflection"
 documentation = "https://docs.rs/reflection"
 description = "reflects of type's fields' names and their type names in a hierarchical tree"
 
 [dependencies]
-trees = "0.1"
+trees = "0.2"

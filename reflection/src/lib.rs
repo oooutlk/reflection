@@ -172,7 +172,7 @@ fn expand_field( node: &mut Node<Member> ) -> bool {
     }
     expander.map( |expander| {
         node.append( expander() );
-        for mut child in node.children_mut() {
+        for mut child in node.iter_mut() {
             expand( &mut child );
         }
         true
@@ -181,7 +181,7 @@ fn expand_field( node: &mut Node<Member> ) -> bool {
 
 fn expand_variant( node: &mut Node<Member> ) -> bool {
     if let Member::Variant(_) = &mut node.data {
-        for mut child in node.children_mut() {
+        for mut child in node.iter_mut() {
             expand_field( &mut child );
         }
         true

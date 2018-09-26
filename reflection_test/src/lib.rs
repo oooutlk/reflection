@@ -186,7 +186,7 @@ fn serde_issue_345() {
     fn members_to_string( node: &Node<Member>, level: usize ) -> String {
         let mut s = String::new();
         let mut nth = 0usize;
-        for child in node.children() {
+        for child in node.iter() {
             s.push_str( &( schema_to_string( child, nth, level+1 ) + &"\n" ));
             nth += 1;
         }

@@ -10,4 +10,4 @@ custom_attribute = []
 [dependencies]
 reflection = { path = "../reflection" }
 reflection_derive = { path = "../reflection_derive" }
-trees = "*"
+trees = "0.2"
